@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>keyboard</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root {
+    --bg: #000;
+    --glow: #2fe6ff;
+  }
+  body {
+    background: radial-gradient(circle at 20% 20%, rgba(47,230,255,0.06), transparent 10%),
+                linear-gradient(180deg,#000 0%, #00121a 100%);
+    color: #e6f7ff;
+    font-family: Inter, Arial, Helvetica, sans-serif;
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+  }
+
+  .panel {
+    width: 100%;
+    max-width: 980px;
+    text-align: center;
+  }
+
+  h1 { margin: 0 0 18px; font-weight: 600; }
+  p { margin: 0 0 24px; color: #bfeefc; }
+
+  .keyboard {
+    display: grid;
+    grid-template-columns: repeat(14, 1fr);
+    gap: 10px;
+    align-items: center;
+    justify-items: center;
+    padding: 18px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(47,230,255,0.05), 0 0 40px rgba(47,230,255,0.05) inset;
+  }
+
+  .key {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border: 1px solid rgba(47,230,255,0.12);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    color: #dffcff;
+    user-select: none;
+    box-shadow: 0 6px 18px rgba(47,230,255,0.03);
+    transform: translateZ(0);
+  }
+
+  .key.visual-pressed {
+    transform: translateY(2px) scale(0.98);
+    box-shadow: 0 4px 8px rgba(47,230,255,0.06) inset;
+    background: linear-gradient(180deg, rgba(47,230,255,0.12), rgba(255,255,255,0.02));
+    color: #001;
+  }
+
+  .hint { margin-top: 14px; font-size: 13px; color: #99e9ff; }
+  .notice { margin-top:8px; color:#83d1e6; font-size:12px; }
+</style>
+</head>
+<body>
+
+<div class="panel">
+  
+  <p>Press any letter (A–Z) or number (0–9) on your physical keyboard to play the tone. On-screen keys are visual only.</p>
+
+  <div class="keyboard" id="visualKeyboard" aria-hidden="true"></div>
+
+  <div class="hint">Tip: Focus anywhere on the page and press keys. Works on desktop browsers (some mobile browsers require an initial tap).</div>
+  <div class="notice">Make sure <code>om-sound.mp3</code> is placed in the same folder as this file.</div>
+</div>
+
+<script>
+/* ============================
+   Visual keyboard layout data
+   (purely visual; clicks disabled)
+   ============================ */
+const rows = [
+  "1234567890",
+  "qwertyuiop",
+  "asdfghjkl",
+  "zxcvbnm"
+];
+
+const keyboardEl = document.getElementById('visualKeyboard');
+
+// Create a simple visual layout (fills grid left-to-right)
+const visualKeys = [];
+for (const row of rows) {
+  for (const ch of row) {
+    visualKeys.push(ch.toUpperCase());
+  }
+}
+// fill remaining grid cells to make it look nicer (optional)
+while (visualKeys.length < 56) visualKeys.push('');
+
+for (const label of visualKeys) {
+  const d = document.createElement('div');
+  d.className = 'key';
+  d.textContent = label;
+  // clicks should NOT play sound (user requested keyboard-only)
+  d.addEventListener('click', (e) => {
+    // prevent pointer focus from interfering; purely visual
+    e.preventDefault();
+  });
+  keyboardEl.appendChild(d);
+}
+
+/* ============================
+   Audio setup using Web Audio API
+   - Preloads om-sound.mp3 into an AudioBuffer
+   - Plays from that buffer on each key press (low latency, overlapping)
+   ============================ */
+
+let audioCtx = null;
+let omBuffer = null;
+// const SOUND_PATH = 'tmkfj.mp3';
+const SOUND_PATH = 'fah.mp3';
+// const SOUND_PATH = 'om-sound.mp3';
+
+
+
+// initialize audio context / load buffer on first user gesture
+async function initAudio() {
+  if (audioCtx) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // fetch audio file and decode
+    const resp = await fetch(SOUND_PATH);
+    if (!resp.ok) throw new Error('Failed to load sound: ' + resp.status);
+    const arrayBuffer = await resp.arrayBuffer();
+    omBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    console.log('Om sound loaded.');
+  } catch (err) {
+    console.error('Audio init error:', err);
+    omBuffer = null;
+  }
+}
+
+// play the pre-decoded buffer
+function playOm() {
+  if (!audioCtx) {
+    // Try to init if not yet initialized (usually keyboard press is allowed as user gesture)
+    initAudio().then(() => {
+      if (omBuffer) playOm(); // play after load
+    }).catch(() => {});
+    return;
+  }
+  if (!omBuffer) return;
+  const src = audioCtx.createBufferSource();
+  src.buffer = omBuffer;
+  src.connect(audioCtx.destination);
+  src.start(0);
+}
+
+/* ============================
+   Key handling: only A–Z and 0–9
+   - Uses keydown on document
+   - Accepts top-row numbers and numpad numbers (e.key returns the character)
+   - Ignores modifier keys, etc.
+   ============================ */
+
+function isAlphaNumKey(key) {
+  // key is a string like 'a', 'A', '1', etc.
+  if (!key || typeof key !== 'string') return false;
+  // Accept single char a-z or 0-9
+  return /^[a-z0-9]$/i.test(key);
+}
+
+const visualKeyMap = {};
+// map labels to visual elements to animate press
+document.querySelectorAll('.key').forEach(k => {
+  if (k.textContent) visualKeyMap[k.textContent.toLowerCase()] = k;
+});
+
+document.addEventListener('keydown', async (e) => {
+  // Ensure audio context exists (many browsers require a user gesture to start it)
+  if (!audioCtx) {
+    // initializing here because keydown is a real user gesture
+    // we don't await to keep UI responsive; init will complete quickly
+    initAudio();
+  }
+
+  const key = e.key; // this gives the character for letters/numbers
+  if (!isAlphaNumKey(key)) return;
+
+  // Prevent typing into focused inputs elsewhere (optional)
+  // If you want typing to still happen in inputs, remove the next block:
+  const active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
+    // if the user is typing in a text field, do not play sound (avoid annoyance)
+    return;
+  }
+
+  // Play the sound
+  playOm();
+
+  // Visual feedback: find the matching on-screen key and animate it briefly
+  const label = key.toLowerCase();
+  const el = visualKeyMap[label];
+  if (el) {
+    el.classList.add('visual-pressed');
+    setTimeout(() => el.classList.remove('visual-pressed'), 120);
+  }
+});
+
+
+// Extra: If user interacts with the page by clicking/tapping anywhere first,
+// initialize audio earlier so subsequent key presses are instant.
+window.addEventListener('pointerdown', () => initAudio(), { once: true });
+
+</script>
+</body>
+</html>
