@@ -68,6 +68,44 @@
 
   .hint { margin-top: 14px; font-size: 13px; color: #99e9ff; }
   .notice { margin-top:8px; color:#83d1e6; font-size:12px; }
+
+  /* Mobile responsiveness */
+  @media (max-width: 768px) {
+    body {
+      padding: 16px;
+    }
+    .keyboard {
+      grid-template-columns: repeat(10, 1fr);
+      gap: 8px;
+      padding: 12px;
+    }
+    .key {
+      width: 44px;
+      height: 44px;
+      font-size: 14px;
+    }
+    h1 {
+      font-size: 24px;
+    }
+    p {
+      font-size: 14px;
+    }
+    .hint, .notice {
+      font-size: 12px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .keyboard {
+      grid-template-columns: repeat(8, 1fr);
+      gap: 6px;
+    }
+    .key {
+      width: 40px;
+      height: 40px;
+      font-size: 12px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -79,6 +117,7 @@
   <div class="keyboard" id="visualKeyboard" aria-hidden="true"></div>
 
   <div class="hint">Tip: Focus anywhere on the page and press keys. Works on desktop browsers (some mobile browsers require an initial tap).</div>
+  <div class="notice">Make sure <code>om-sound.mp3</code> is placed in the same folder as this file.</div>
 </div>
 
 <script>
@@ -125,8 +164,8 @@ for (const label of visualKeys) {
 
 let audioCtx = null;
 let omBuffer = null;
-const SOUND_PATH = 'tmkfj.mp3';
-// const SOUND_PATH = 'fah.mp3';
+// const SOUND_PATH = 'tmkfj.mp3';
+const SOUND_PATH = 'fah.mp3';
 // const SOUND_PATH = 'om-sound.mp3';
 
 
